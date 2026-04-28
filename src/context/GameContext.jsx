@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
+import { db } from '../firebase'
 import { generateBracket, autoAdvanceByes, advanceWinner } from '../utils/tournamentUtils'
 
-const STORAGE_KEY = 'aca_sports_day_data'
+const FIRESTORE_DOC = 'aca_sports/state'
 
 const GameContext = createContext(null)
 
@@ -11,25 +13,13 @@ const initialState = {
   matches: {},
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return initialState
-    return JSON.parse(raw)
-  } catch {
-    return initialState
-  }
+// Write the full state to Firestore
+async function saveState(state) {
+  await setDoc(doc(db, 'aca_sports', 'state'), state)
 }
 
-function saveState(state) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // ignore
-  }
-}
-
-function reducer(state, action) {
+// Compute new state from an action using pure reducer logic
+function applyAction(state, action) {
   switch (action.type) {
     case 'REGISTER_TEAM': {
       const { sport, teamData } = action
@@ -44,7 +34,6 @@ function reducer(state, action) {
       const { sport, teamId } = action
       const tournament = state.tournaments[sport]
       if (!tournament || !tournament.started) {
-        // Remove from registration
         const teams = (state.teams[sport] || []).filter(t => t.id !== teamId)
         return {
           ...state,
@@ -79,7 +68,6 @@ function reducer(state, action) {
       let bracket = generateBracket(sportTeams, sport)
       bracket = autoAdvanceByes(bracket)
 
-      // Build matches map from bracket
       const newMatches = { ...state.matches }
       bracket.rounds.forEach((round, rIdx) => {
         round.forEach((match) => {
@@ -121,7 +109,6 @@ function reducer(state, action) {
       let bracket = advanceWinner(tournament.bracket, matchId, winnerId)
       bracket = autoAdvanceByes(bracket)
 
-      // Update all bracket matches back into matches map
       const newMatches = { ...state.matches }
       bracket.rounds.forEach((round, rIdx) => {
         round.forEach((match) => {
@@ -136,7 +123,6 @@ function reducer(state, action) {
         })
       })
 
-      // Update the current match winner
       if (newMatches[matchId]) {
         newMatches[matchId].winner = winnerId
         newMatches[matchId].status = 'completed'
@@ -162,11 +148,36 @@ function reducer(state, action) {
 }
 
 export function GameProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, null, loadState)
+  const [state, setState] = useState(initialState)
+  const [loading, setLoading] = useState(true)
+  // Track the latest state in a ref so action handlers always see current state
+  const stateRef = useRef(state)
+  useEffect(() => { stateRef.current = state }, [state])
 
+  // Subscribe to Firestore real-time updates
   useEffect(() => {
-    saveState(state)
-  }, [state])
+    const ref = doc(db, 'aca_sports', 'state')
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      if (snapshot.exists()) {
+        setState(snapshot.data())
+      } else {
+        setState(initialState)
+      }
+      setLoading(false)
+    }, () => {
+      // On error (e.g. offline) fall back gracefully and stop loading
+      setLoading(false)
+    })
+    return unsubscribe
+  }, [])
+
+  // Dispatch an action: compute next state locally, then persist to Firestore
+  function dispatch(action) {
+    const next = applyAction(stateRef.current, action)
+    stateRef.current = next
+    setState(next)
+    saveState(next)
+  }
 
   const actions = {
     registerTeam: (sport, teamData) => dispatch({ type: 'REGISTER_TEAM', sport, teamData }),
@@ -176,6 +187,14 @@ export function GameProvider({ children }) {
     advanceMatchWinner: (sport, matchId, winnerId) =>
       dispatch({ type: 'ADVANCE_MATCH_WINNER', sport, matchId, winnerId }),
     resetAll: () => dispatch({ type: 'RESET_ALL' }),
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#757575' }}>
+        Connecting…
+      </div>
+    )
   }
 
   return (
