@@ -49,8 +49,14 @@ export function addPoint(state, team) {
       // wins game
       return resolveGameWon(newState, team)
     } else {
-      // back to deuce
+      // back to deuce - increment deuce counter
+      newState.deuceCount += 1
       newState.advantage = null
+      // If deuce has been reached twice (i.e., deuceCount >= 2), switch to golden deuce
+      if (newState.deuceCount >= 2) {
+        newState.isGoldenDeuce = true
+        newState.isDeuce = false
+      }
       return newState
     }
   }
@@ -66,18 +72,11 @@ export function addPoint(state, team) {
   const scorerPts = newState[`${team}Points`] + 1
   newState[`${team}Points`] = scorerPts
 
-  // Check for 40-40 (both at index 3)
+  // Check for 40-40 (both at index 3) — first deuce
   if (newState.team1Points === 3 && newState.team2Points === 3) {
-    // Check if deuce already reached once or more
-    if (newState.deuceCount >= 1) {
-      // Golden deuce
-      newState.isGoldenDeuce = true
-      newState.isDeuce = false
-    } else {
-      newState.isDeuce = true
-      newState.isGoldenDeuce = false
-      newState.deuceCount = newState.deuceCount + 1
-    }
+    newState.isDeuce = true
+    newState.isGoldenDeuce = false
+    newState.deuceCount = 1
     newState.advantage = null
     return newState
   }
@@ -156,7 +155,6 @@ export function getPointDisplay(state) {
 export function removePoint(state, team) {
   // Simple undo: step back from last scored point
   if (state.setWon) {
-    // Cannot undo set win easily; just return state
     return state
   }
   const newState = { ...state }
@@ -167,31 +165,32 @@ export function removePoint(state, team) {
     }
     return newState
   }
+  // Undo from golden deuce → back to advantage state (second deuce)
   if (newState.isGoldenDeuce) {
     newState.isGoldenDeuce = false
     newState.isDeuce = true
-    return newState
-  }
-  if (newState.isDeuce && newState.advantage === team) {
+    newState.deuceCount = 2
     newState.advantage = null
     return newState
   }
+  // Undo advantage (the team with advantage had scored)
   if (newState.isDeuce && newState.advantage !== null) {
-    const other = team === 'team1' ? 'team2' : 'team1'
-    if (newState.advantage === other) {
-      newState.advantage = null
-      return newState
-    }
+    newState.advantage = null
+    return newState
   }
-  if (newState.isDeuce && newState.advantage === null) {
-    // Back before deuce
+  // Undo reaching deuce (second deuce) → go back to golden deuce prompt
+  if (newState.isDeuce && newState.advantage === null && newState.deuceCount >= 2) {
     newState.isDeuce = false
-    newState.deuceCount = Math.max(0, newState.deuceCount - 1)
+    newState.isGoldenDeuce = true
+    newState.deuceCount = Math.max(1, newState.deuceCount - 1)
+    return newState
+  }
+  // Undo reaching first deuce → back before deuce
+  if (newState.isDeuce && newState.advantage === null) {
+    newState.isDeuce = false
+    newState.deuceCount = 0
     newState.team1Points = 3
-    newState.team2Points = 3
-    if (newState[`${team}Points`] > 0) {
-      newState[`${team}Points`] -= 1
-    }
+    newState.team2Points = 2
     return newState
   }
   if (newState[`${team}Points`] > 0) {
