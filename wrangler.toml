@@ -1,0 +1,15 @@
+name = "aca-sports-day"
+main = "worker.js"
+compatibility_date = "2026-04-29"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[durable_objects.bindings]]
+name = "SPORTS_ROOM"
+class_name = "SportsDayRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SportsDayRoom"]
