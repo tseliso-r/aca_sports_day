@@ -1,4 +1,4 @@
-name = "aca-sports-day"
+name = "acasportsday"
 main = "worker.js"
 compatibility_date = "2026-04-29"
 
@@ -13,3 +13,4 @@ class_name = "SportsDayRoom"
 [[migrations]]
 tag = "v1"
 new_classes = ["SportsDayRoom"]
+new_sqlite_classes = ["SportsDayRoom"]
