@@ -38,6 +38,29 @@ npm run dev
 
 Open the same URL on any device on your network — all score updates appear in real time across every connected browser.
 
+## Deploying to GitHub Pages
+
+The repository includes a GitHub Actions workflow (`.github/workflows/gh-pages-deploy.yml`) that builds and deploys the site automatically on every push to `main`.
+
+### Required: add Firebase credentials as GitHub Secrets
+
+Because Firebase credentials are baked into the bundle at build time, you must store them as **GitHub Actions secrets** before the workflow can produce a working deployment.
+
+1. In your GitHub repository, go to **Settings → Secrets and variables → Actions → New repository secret**.
+2. Add one secret for each variable below (names must match exactly):
+
+| Secret name | Value |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | your `apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | your `authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | your `projectId` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | your `storageBucket` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | your `messagingSenderId` |
+| `VITE_FIREBASE_APP_ID` | your `appId` |
+
+3. In your repository, go to **Settings → Pages** and set the source to **GitHub Actions**.
+4. Push to `main` (or trigger the workflow manually via **Actions → Deploy static content to Pages → Run workflow**) — the site will be live at `https://<your-username>.github.io/aca_sports_day/`.
+
 ## Multi-device usage
 
 | Device | Role |

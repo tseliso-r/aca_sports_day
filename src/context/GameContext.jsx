@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { generateBracket, autoAdvanceByes, advanceWinner } from '../utils/tournamentUtils'
 
@@ -96,7 +96,7 @@ function applyAction(state, action) {
         ...state,
         matches: {
           ...state.matches,
-          [matchId]: { ...state.matches[matchId], ...matchData },
+          [matchId]: { ...(state.matches[matchId] || {}), ...matchData },
         },
       }
     }
